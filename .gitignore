@@ -1,0 +1,5 @@
+app2/images/
+app2/images_driver_status/
+app2/face_recognition/weights/
+app1/drowsiness_detection/shape_predictor_68_face_landmarks.dat
+**/__pycache__/
