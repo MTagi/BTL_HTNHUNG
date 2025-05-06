@@ -410,6 +410,16 @@ def list_driver_locations():
         l['_id'] = str(l['_id'])
     return jsonify(locations)
 
+@app.route('/driver_locations/vehicle/<int:vehicle_id>', methods=['GET'])
+def get_locations_by_vehicle(vehicle_id):
+    locations = list(driver_location_db.find({'vehicle_id': vehicle_id}))
+    if not locations:
+        return jsonify({'error': 'Không tìm thấy vị trí nào cho xe này'}), 404
+
+    for loc in locations:
+        loc['_id'] = str(loc['_id'])  # chuyển ObjectId sang string để JSON hóa
+
+    return jsonify(locations), 200
 # Lấy chi tiết 1 vị trí
 @app.route('/driver_locations/<int:location_id>', methods=['GET'])
 def get_driver_location(location_id):
