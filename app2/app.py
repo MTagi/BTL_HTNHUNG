@@ -340,6 +340,24 @@ def get_attendance(attendance_id):
         return jsonify({'error': 'Không tìm thấy điểm danh'}), 404
     attendance['_id'] = str(attendance['_id'])
     return jsonify(attendance)
+
+@app.route('/get_images_by_path', methods=['POST'])
+def get_images():
+    image_folder = request.form['image_folder']
+    image_data_list = []
+    for filename in os.listdir(image_folder):
+        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif')):
+            filepath = os.path.join(image_folder, filename)
+            name = os.path.splitext(filename)[0]
+
+            with open(filepath, 'rb') as img_file:
+                b64_string = base64.b64encode(img_file.read()).decode('utf-8')
+
+            image_data_list.append({
+                'time': name.replace("-", ":"),
+                'image_base64': b64_string
+            })
+    return jsonify(image_data_list)
 @app.route('/attendances/search', methods=['POST'])
 def search_attendance():
     # Lấy dữ liệu từ body của request (JSON)
@@ -363,35 +381,57 @@ def search_attendance():
 
     attendance['_id'] = str(attendance['_id'])  # Convert ObjectId thành chuỗi
     return jsonify(attendance)
+from model.AttendanceDetailDatabase import AttendanceDetailDatabase
+attendancedetaildb = AttendanceDetailDatabase()
+def add_attendance_detail(attendances_id, time, image, folder_path):
+    # Tạo tên và lưu ảnh
+    time = time.replace(":", "-").replace(".", "-")
+    image_name = f"{time}"
+    image_path = os.path.join(folder_path, f"{image_name}.jpg")
+    image.save(image_path)
+    a, b =  attendancedetaildb.add_attendance_detail(attendances_id, time, image_path)
+
 # Thêm điểm danh cho tài xế
 @app.route('/attendances/add', methods=['POST'])
 def add_attendance():
-    data = request.get_json()
-    driver_id = data.get('driver_id')
-    vehicle_id = data.get('vehicle_id')
-    note = data.get('note')
+    driver_id = request.form['driver_id']
+    date = request.form['date']
+    checkin_time = request.form['checkin_time']
+    image = request.files['image']
 
-    if not all([driver_id, vehicle_id, note]):
-        return jsonify({'error': 'Thiếu thông tin'}), 400
+    folder_name = f"{driver_id}_{date}"
+    # Tạo tên folder từ driver_id và date
+    folder_name = f"{driver_id}_{date}"
 
-    inserted_id, attendance_id = attendance_db.add_attendance(driver_id, vehicle_id, note)
+    # Xác định đường dẫn folder "thang"
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # Đường dẫn của file hiện tại
+    image_attendance_folder = os.path.join(base_dir, "image_attendance")  # Folder "thang"
+
+    # Tạo folder con với tên là folder_name trong folder "thang"
+    new_folder_path = os.path.join(image_attendance_folder, folder_name)
+
+    # Kiểm tra nếu folder mới chưa tồn tại thì tạo
+    if not os.path.exists(new_folder_path):
+        os.makedirs(new_folder_path)
+        print(f"Folder '{new_folder_path}' đã được tạo.")
+    else:
+        print(f"Folder '{new_folder_path}' đã tồn tại.")
+    
+    inserted_id, attendance_id = attendance_db.add_attendance(driver_id, date, checkin_time, new_folder_path)
+    add_attendance_detail(attendance_id, checkin_time, image,  new_folder_path)
+
     return jsonify({'message': 'Điểm danh thành công', 'attendance_id': attendance_id})
 
 # Cập nhật điểm danh
 @app.route('/attendances/update', methods=['POST'])
 def update_attendance():
-    data = request.get_json()
-    attendance_id = data.get('attendance_id')
-    driver_id = data.get('driver_id')
-    vehicle_id = data.get('vehicle_id')
-    checkin_time = data.get('checkin_time')
-    checkout_time = data.get('checkout_time')
-    note = data.get('note')
-
-    if not all([attendance_id, driver_id, vehicle_id, checkin_time, checkout_time, note]):
-        return jsonify({'error': 'Thiếu thông tin'}), 400
-
-    modified_count = attendance_db.update_attendance(attendance_id, driver_id, vehicle_id, checkin_time, checkout_time, note)
+    attendance_id =  request.form['attendance_id']
+    driver_id =  request.form['driver_id']
+    checkout_time =  request.form['checkout_time']
+    folder_path = request.form['folder_path']
+    image = request.files['image']
+    modified_count = attendance_db.update_attendance(int(attendance_id), int(driver_id), checkout_time)
+    add_attendance_detail(attendance_id , checkout_time, image,  folder_path)
     if modified_count == 0:
         return jsonify({'error': 'Không tìm thấy điểm danh'}), 404
     return jsonify({'message': 'Cập nhật điểm danh thành công'})
@@ -412,12 +452,13 @@ def list_driver_locations():
 
 @app.route('/driver_locations/vehicle/<int:vehicle_id>', methods=['GET'])
 def get_locations_by_vehicle(vehicle_id):
-    locations = list(driver_location_db.find({'vehicle_id': vehicle_id}))
+    locations = driver_location_db.list_locations_by_vehicle(vehicle_id)
     if not locations:
         return jsonify({'error': 'Không tìm thấy vị trí nào cho xe này'}), 404
 
+    # Chuyển ObjectId về string để trả JSON được
     for loc in locations:
-        loc['_id'] = str(loc['_id'])  # chuyển ObjectId sang string để JSON hóa
+        loc['_id'] = str(loc['_id'])
 
     return jsonify(locations), 200
 # Lấy chi tiết 1 vị trí
@@ -437,11 +478,11 @@ def add_driver_location():
     vehicle_id = data.get('vehicle_id')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
+    timestamp = data.get('timestamp')
+    # if not all([driver_id, vehicle_id, latitude, longitude, timestamp]):
+    #     return jsonify({'error': 'Thiếu thông tin'}), 400
 
-    if not all([driver_id, vehicle_id, latitude, longitude]):
-        return jsonify({'error': 'Thiếu thông tin'}), 400
-
-    inserted_id, location_id = driver_location_db.add_driver_location(driver_id, vehicle_id, latitude, longitude)
+    inserted_id, location_id = driver_location_db.add_driver_location(driver_id, vehicle_id, timestamp, latitude, longitude)
     return jsonify({'message': 'Thêm vị trí tài xế thành công', 'location_id': location_id})
 
 @app.route('/get_image', methods=['POST'])

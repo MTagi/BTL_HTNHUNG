@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from datetime import datetime
 
-class AttendanceDatabase:
+class AttendanceDetailDatabase:
     def __init__(self, uri="mongodb://localhost:27017/", db_name="htnhung", collection_name="attendance_detail"):
         self.client = MongoClient(uri)
         self.db = self.client[db_name]

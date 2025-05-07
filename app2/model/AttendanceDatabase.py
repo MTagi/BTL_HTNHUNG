@@ -13,29 +13,23 @@ class AttendanceDatabase:
             return last_attendance["attendance_id"] + 1
         return 1
 
-    def add_attendance(self, driver_id: int, vehicle_id: int, note: str, folder_path):
+    def add_attendance(self, driver_id: int, date, checkin_time, folder_path):
         attendance_id = self._generate_attendance_id()
-        now = datetime.now()
         attendance_data = {
             "attendance_id": attendance_id,
             "driver_id": driver_id,
-            "vehicle_id": vehicle_id,
-            "date": now.date().isoformat(),
-            "checkin_time": now.time().isoformat(),
+            "date": date,
+            "checkin_time": checkin_time,
             "checkout_time": None,
-            "note": note,
             "folder_path": folder_path
         }
         result = self.collection.insert_one(attendance_data)
         return str(result.inserted_id), attendance_id
 
-    def update_attendance(self, attendance_id: int, driver_id: int, vehicle_id: int, checkin_time: str, checkout_time: str, note: str):
+    def update_attendance(self, attendance_id: int, driver_id: int, checkout_time: str):
         update_data = {
             "driver_id": driver_id,
-            "vehicle_id": vehicle_id,
-            "checkin_time": checkin_time,
             "checkout_time": checkout_time,
-            "note": note
         }
         result = self.collection.update_one(
             {"attendance_id": attendance_id},

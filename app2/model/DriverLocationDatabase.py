@@ -13,14 +13,14 @@ class DriverLocationDatabase:
             return last_location["location_id"] + 1
         return 1
 
-    def add_driver_location(self, driver_id: int, vehicle_id: int, latitude: float, longitude: float):
+    def add_driver_location(self, driver_id: int, vehicle_id: int, timestamp, latitude: float, longitude: float):
         location_id = self._generate_location_id()
         now = datetime.now()
         location_data = {
             "location_id": location_id,
             "driver_id": driver_id,
             "vehicle_id": vehicle_id,
-            "timestamp": now.isoformat(),
+            "timestamp": timestamp,
             "latitude": latitude,
             "longitude": longitude
         }
@@ -48,3 +48,5 @@ class DriverLocationDatabase:
 
     def list_driver_locations(self):
         return list(self.collection.find())
+    def list_locations_by_vehicle(self, vehicle_id: int):
+        return list(self.collection.find({"vehicle_id": vehicle_id}))
